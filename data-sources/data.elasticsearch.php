@@ -146,7 +146,7 @@
 				// find fields that have symphony_highlight
 				foreach($mapping->{$section}->properties as $field => $properties) {
 					if(!$properties->fields->symphony_fulltext) continue;
-					$highlights[] = array($field => (object)array());
+					$highlights[] = array(strtolower($field) => (object)array());
 				}
 			}
 			
@@ -171,11 +171,10 @@
 			// run both queries!
 			$query_result = $search->search($query);
 			$query_all_result = $search->search($query_all);
-			
+
 			// build root XMK element
 			$xml = new XMLElement($this->dsParamROOTELEMENT, NULL, array(
-				'took' => $query_result->getResponse()->getEngineTime() . 'ms',
-				'max-score' => round($query_result->getMaxScore(), 4)
+				'took' => $query_result->getResponse()->getEngineTime() . 'ms'
 			));
 			
 			// append keywords to the XML

@@ -238,7 +238,7 @@
 				'data-dateMax' => date('Y-m-d', strtotime($range->max)),
 				'class' => 'label date-range'
 			));
-			$label->appendChild(new XMLElement('span', _('Date range')));
+			$label->appendChild(new XMLElement('span', __('Date range')));
 			$label->appendChild(new XMLElement('input', NULL, array(
 				'type' => 'text',
 				'placeholder' => __('From'),
@@ -257,7 +257,12 @@
 			$form->appendChild($label);
 			
 			// generate a random noun
-			$password = General::generatePassword();
+			if(function_exists('openssl_random_pseudo_bytes')) {
+				$password = openssl_random_pseudo_bytes(20);
+			}
+			else {
+				$password = str_shuffle(uniqid());
+			}
 			$password = preg_replace('/[0-9]/', '', $password); // remove numbers
 			preg_match('/([A-Z][a-z]+){1,}/', $password, $nouns); // split into separate words based on capitals
 			$noun = strtolower(end($nouns));
