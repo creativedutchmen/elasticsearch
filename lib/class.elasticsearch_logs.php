@@ -37,6 +37,7 @@ Class ElasticSearchLogs {
 		));
 		
 		if(!$already_logged) {
+			$ip = ($_SERVER['REMOTE_ADDR'] == '127.0.0.1')?$_SERVER['HTTP_X_FORWARDED_FOR']:$_SERVER['REMOTE_ADDR'];
 			Symphony::Database()->insert(
 				array(
 					'id' => $id,
@@ -47,7 +48,7 @@ Class ElasticSearchLogs {
 					'page' => $page,
 					'results' => $total_entries,
 					'session_id' => self::$_session_id,
-					'user_agent' => Symphony::Database()->cleanValue(HTTP_USER_AGENT),
+					'user_agent' => Symphony::Database()->cleanValue($ip),
 					'ip' => Symphony::Database()->cleanValue(REMOTE_ADDR),
 				),
 				'tbl_elasticsearch_logs',
