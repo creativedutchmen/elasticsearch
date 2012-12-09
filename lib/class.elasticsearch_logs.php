@@ -48,8 +48,8 @@ Class ElasticSearchLogs {
 					'page' => $page,
 					'results' => $total_entries,
 					'session_id' => self::$_session_id,
-					'user_agent' => Symphony::Database()->cleanValue($ip),
-					'ip' => Symphony::Database()->cleanValue(REMOTE_ADDR),
+					'user_agent' => Symphony::Database()->cleanValue(HTTP_USER_AGENT),
+					'ip' => Symphony::Database()->cleanValue($ip),
 				),
 				'tbl_elasticsearch_logs',
 				TRUE
