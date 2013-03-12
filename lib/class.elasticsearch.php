@@ -220,38 +220,9 @@ Class ElasticSearch {
 		http://lucene.apache.org/core/old_versioned_docs/versions/3_0_0/queryparsersyntax.html
 	*/
 	public static function filterKeywords($keywords) {
-		// strip tags, should aid against XSS
-		$keywords = strip_tags($keywords);
-		// remove characters from start/end
-		$keywords = trim($keywords, '-+ ');
-		// append leading space for future matching
-		$keywords = ' ' . $keywords;
-		// remove wilcard `*` and `?` and fuzzy `~`
-		$keywords = preg_replace("/\*|\?|\~/", "", $keywords);
-		// remove range syntax `{}`
-		$keywords = preg_replace("/\{|\}/", "", $keywords);
-		// remove group `()` and`[]` chars
-		$keywords = preg_replace("/\(|\)|\[|\]/", "", $keywords);
-		// remove boost `^`
-		$keywords = preg_replace("/\^/", "", $keywords);
-		// remove not `!`
-		$keywords = preg_replace("/\!/", "", $keywords);
-		// remove and `&&`
-		$keywords = preg_replace("/\&\&/", "", $keywords);
-		// remove or `||`
-		$keywords = preg_replace("/\|\|/", "", $keywords);
-		// remove fields such as `title:`
-		$keywords = preg_replace("/([a-zA-Z0-9_-]+\:)/", "", $keywords);
-		// remove `-` that don't have spaces before them
-		$keywords = preg_replace("/(?<! )-/", "", $keywords);
-		// remove the spaces after a + or -
-		$keywords = preg_replace("/([+-])\s+/", "", $keywords);
-	    // remove multiple spaces
-		$keywords = preg_replace("/\s{1,}/", " ", $keywords);
-		// add trailing quotes if missing
-		$quotes = substr_count($keywords, '"');
-		if($quotes % 2) $keywords .= '"';
-		
+		$keywords = preg_replace('/([^a-z ])/', '', $keywords);
+		//echo $keywords;
+
 		return trim($keywords);
 	}
 	

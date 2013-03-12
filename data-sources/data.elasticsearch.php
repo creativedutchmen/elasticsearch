@@ -86,15 +86,17 @@
 			
 			// create a new facet on the entry _type (section handle). this will return a list
 			// of sections in which the matching entries reside, and a count of matches in each
-			$facet = new Elastica_Facet_Terms('filtered-sections');
-			$facet->setField('_type');
-			$query->addFacet($facet);
-			
+			$query_all = new Elastica_Query();
+			$elasticaFacet 	= new Elastica_Facet_Terms('tags');
+			$elasticaFacet->setField('tags');
+			$elasticaFacet->setSize(25);
+			$elasticaFacet->setOrder('count');
+			$query->addFacet($elasticaFacet);
+
 			// we also want a list of _all_ sections and their total entry counts. facets run within the context
 			// of the query they are attached to, so we want a new query that searches within the specified sections
 			// but doesn't search on the keywords (so it finds everything). ES supports this with a match_all query
 			// which Elastica creates by default when you create a plain query object
-			$query_all = new Elastica_Query();
 			$facet = new Elastica_Facet_Terms('all-sections');
 			$facet->setField('_type');
 			$query_all->addFacet($facet);
@@ -151,7 +153,24 @@
 			}
 			
 			// add the section filter to both queries (keyword search and the all entries facet search)
-			$query->setFilter($filter);
+			$elasticaFilterAnd 	= new Elastica_Filter_And();
+			$elasticaFilterAnd->addFilter($filter);
+
+			$tags = $_GET['tags'];
+			if(!empty($tags)){
+				if(!is_array($tags)){
+					$tags = array($tags);
+				}
+				$tagsFilter = new Elastica_filter_Or();
+				foreach($tags as $tag){
+					$filter = new Elastica_Filter_Term();
+					$filter->setTerm('tags', $tag);
+					$tagsFilter->addFilter($filter);
+				}
+				$elasticaFilterAnd->addFilter($tagsFilter);
+			}
+
+			$query->setFilter($elasticaFilterAnd);
 			$query_all->setFilter($filter);
 			
 			// configure highlighting for the keyword search
@@ -194,12 +213,13 @@
 			// build facets
 			$xml_facets = new XMLElement('facets');
 			// merge the facets from both queries so they appear as one
-			$facets = array_merge($query_result->getFacets(), $query_all_result->getFacets());
+			$facets = $query_result->getFacets();
+			//var_dump($query_result);
 			foreach($facets as $handle => $facet) {
 				$xml_facet = new XMLElement('facet', NULL, array('handle' => $handle));
 				foreach($facet['terms'] as $term) {
 					// only show sections that are in default config, if it is being used
-					if(!in_array($term['term'], $all_mapped_sections)) continue;
+					//if(!in_array($term['term'], $all_mapped_sections)) continue;
 					$xml_facet_term = new XMLElement('term', $section_full_names[$term['term']], array(
 						'handle' => $term['term'],
 						'entries' => $term['count'],

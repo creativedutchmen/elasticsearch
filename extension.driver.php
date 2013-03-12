@@ -157,6 +157,7 @@
 		}
 		
 		public function generate_session($context) {
+			return;
 			$cookie_name = sprintf('%sselasticsearch-session', Symphony::Configuration()->set('cookie_prefix', 'symphony'));
 			$cookie_value = $_COOKIE[$cookie_name];
 			// cookie has not been set
