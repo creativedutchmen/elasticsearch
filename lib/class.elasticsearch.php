@@ -3,6 +3,7 @@
 function __autoload_elastica ($class) {
 	$path = str_replace('_', '/', $class);
 	$load = EXTENSIONS . '/elasticsearch/lib/Elastica/lib/' . $path . '.php';
+	echo $path;
 	if (file_exists($load)) require_once($load);
 }
 spl_autoload_register('__autoload_elastica');
