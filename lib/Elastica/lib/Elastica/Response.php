@@ -1,161 +1,235 @@
 <?php
+
+namespace Elastica;
+use Elastica\Exception\NotFoundException;
+
 /**
  * Elastica Response object
  *
- * Stores query time, and result array -> is given to resultset, returned by ...
+ * Stores query time, and result array -> is given to result set, returned by ...
  *
  * @category Xodoa
  * @package Elastica
  * @author Nicolas Ruflin <spam@ruflin.com>
  */
-class Elastica_Response {
+class Response
+{
+    /**
+     * Query time
+     *
+     * @var float Query time
+     */
+    protected $_queryTime = null;
 
-	protected $_queryTime = null;
-	protected $_responseString = '';
-	protected $_error = false;
-	protected $_transferInfo = array();
-	protected $_response = null;
+    /**
+     * Response string (json)
+     *
+     * @var string Response
+     */
+    protected $_responseString = '';
 
-	/**
-	 * @param string $responseString Response string (json)
-	 */
-	public function __construct($responseString) {
-		$this->_responseString = $responseString;
-	}
+    /**
+     * Error
+     *
+     * @var boolean Error
+     */
+    protected $_error = false;
 
-	/**
-	 * @return string Error message
-	 */
-	public function getError() {
-		$message = '';
-		$response = $this->getData();
+    /**
+     * Transfer info
+     *
+     * @var array transfer info
+     */
+    protected $_transferInfo = array();
 
-		if (isset($response['error'])) {
-			$message = $response['error'];
-		}
-		return $message;
-	}
+    /**
+     * Response
+     *
+     * @var \Elastica\Response Response object
+     */
+    protected $_response = null;
 
-	/**
-	 * @return bool True if response has error
-	 */
-	public function hasError() {
-		$response = $this->getData();
+    /**
+     * Construct
+     *
+     * @param string|array $responseString Response string (json)
+     */
+    public function __construct($responseString)
+    {
+        if (is_array($responseString)) {
+            $this->_response = $responseString;
+        } else {
+            $this->_responseString = $responseString;
+        }
+    }
 
-		if (isset($response['error'])) {
-			return true;
-		}
-		return false;
-	}
+    /**
+     * Error message
+     *
+     * @return string Error message
+     */
+    public function getError()
+    {
+        $message = '';
+        $response = $this->getData();
 
-	/**
-	 * Checks if the query returned ok
-	 *
-	 * @return bool True if ok
-	 */
-	public function isOk() {
-		$data = $this->getData();
-		return (isset($data['ok']) && $data['ok']);
-	}
+        if (isset($response['error'])) {
+            $message = $response['error'];
+        }
 
-	/**
-	 * @return array Response data array
-	 */
-	public function getData() {
+        return $message;
+    }
 
-		if ($this->_response == null) {
-			$response = $this->_responseString;
-			if ($response === false) {
-				$this->_error = true;
-			} else {
+    /**
+     * True if response has error
+     *
+     * @return bool True if response has error
+     */
+    public function hasError()
+    {
+        $response = $this->getData();
 
-				$tempResponse = json_decode($response, true);
-				// If error is returned, json_decod makes empty string of string
-				if (!empty($tempResponse)) {
-					$response = $tempResponse;
-				}
-			}
+        if (isset($response['error'])) {
+            return true;
+        }
 
-			if (empty($response)) {
-				$response = array();
-			}
+        return false;
+    }
 
-			if (is_string($response)) {
-				$response = array('message' => $response);
-			}
+    /**
+     * Checks if the query returned ok
+     *
+     * @return bool True if ok
+     */
+    public function isOk()
+    {
+        $data = $this->getData();
 
-			$this->_response = $response;
-		}
-		return $this->_response;
-	}
+        // Bulk insert checks. Check every item
+        if (isset($data['items'])) {
+            foreach ($data['items'] as $item) {
+                if (false == $item['index']['ok']) {
+                    return false;
+                 }
+            }
 
-	/**
-	 * Gets the transfer information if in DEBUG mode.
-	 *
-	 * @return array Information about the curl request.
-	 */
-	public function getTransferInfo() {
-		return $this->_transferInfo;
-	}
+            return true;
+        }
 
-	/**
-	 * Sets the transfer info of the curl request. This function is called
-	 * from the Elastica_Client::_callService only in debug mode.
-	 *
-	 * @param array $transferInfo The curl transfer information.
-	 * @return Elastica_Response Current object
-	 */
-	public function setTransferInfo(array $transferInfo) {
-		$this->_transferInfo = $transferInfo;
-		return $this;
-	}
+        return (isset($data['ok']) && $data['ok']);
+    }
 
-	/**
-	 * This is only available if DEBUG constant is set to true
-	 *
-	 * @return float Query time
-	 */
-	public function getQueryTime() {
-		return $this->_queryTime;
-	}
+    /**
+     * Response data array
+     *
+     * @return array Response data array
+     */
+    public function getData()
+    {
+        if ($this->_response == null) {
+            $response = $this->_responseString;
+            if ($response === false) {
+                $this->_error = true;
+            } else {
 
-	/**
-	 * Sets the query time
-	 *
-	 * @param float $queryTime Query time
-	 * @return Elastica_Response Current object
-	 */
-	public function setQueryTime($queryTime) {
-		$this->_queryTime = $queryTime;
-		return $this;
-	}
+                $tempResponse = json_decode($response, true);
+                // If error is returned, json_decode makes empty string of string
+                if (!empty($tempResponse)) {
+                    $response = $tempResponse;
+                }
+            }
 
-	/**
-	 * @return int Time request took
-	 */
-	public function getEngineTime() {
-		$data = $this->getData();
+            if (empty($response)) {
+                $response = array();
+            }
 
-		if (!isset($data['took'])) {
-			throw new Elastica_Exception_NotFound("Unable to find the field [took]from the response");
-		}
+            if (is_string($response)) {
+                $response = array('message' => $response);
+            }
 
-		return $data['took'];
-	}
+            $this->_response = $response;
+        }
 
-	/**
-	 * Get the _shard statistics for the response
-	 *
-	 * @return array
-	 */
-	public function getShardsStatistics() {
-		$data = $this->getData();
+        return $this->_response;
+    }
 
-		if (!isset($data['_shards'])) {
-			throw new Elastica_Exception_NotFound("Unable to find the field [_shards] from the response");
-		}
+    /**
+     * Gets the transfer information.
+     *
+     * @return array Information about the curl request.
+     */
+    public function getTransferInfo()
+    {
+        return $this->_transferInfo;
+    }
 
-		return $data['_shards'];
-	}
+    /**
+     * Sets the transfer info of the curl request. This function is called
+     * from the \Elastica\Client::_callService .
+     *
+     * @param  array             $transferInfo The curl transfer information.
+     * @return \Elastica\Response Current object
+     */
+    public function setTransferInfo(array $transferInfo)
+    {
+        $this->_transferInfo = $transferInfo;
+        return $this;
+    }
 
+    /**
+     * This is only available if DEBUG constant is set to true
+     *
+     * @return float Query time
+     */
+    public function getQueryTime()
+    {
+        return $this->_queryTime;
+    }
+
+    /**
+     * Sets the query time
+     *
+     * @param  float             $queryTime Query time
+     * @return \Elastica\Response Current object
+     */
+    public function setQueryTime($queryTime)
+    {
+        $this->_queryTime = $queryTime;
+
+        return $this;
+    }
+
+    /**
+     * Time request took
+     *
+     * @throws \Elastica\Exception\NotFoundException
+     * @return int                                  Time request took
+     */
+    public function getEngineTime()
+    {
+        $data = $this->getData();
+
+        if (!isset($data['took'])) {
+            throw new NotFoundException("Unable to find the field [took]from the response");
+        }
+
+        return $data['took'];
+    }
+
+    /**
+     * Get the _shard statistics for the response
+     *
+     * @throws \Elastica\Exception\NotFoundException
+     * @return array
+     */
+    public function getShardsStatistics()
+    {
+        $data = $this->getData();
+
+        if (!isset($data['_shards'])) {
+            throw new NotFoundException("Unable to find the field [_shards] from the response");
+        }
+
+        return $data['_shards'];
+    }
 }
