@@ -1,4 +1,10 @@
 <?php
+
+namespace Elastica;
+
+use Elastica\Exception\InvalidException;
+use Elastica\Bulk\Action;
+
 /**
  * Single document stored in elastic search
  *
@@ -6,307 +12,781 @@
  * @package  Elastica
  * @author   Nicolas Ruflin <spam@ruflin.com>
  */
-class Elastica_Document {
+class Document extends Param
+{
+    const OP_TYPE_CREATE = Action::OP_TYPE_CREATE;
 
-	/**
-	 * @var string|int	Document id
-	 */
-	protected $_id = '';
+    /**
+     * Document data
+     *
+     * @var array Document data
+     */
+    protected $_data = array();
 
-	/**
-	 * @var array Document data
-	 */
-	protected $_data = array();
+    /**
+     * @var \Elastica\Script
+     */
+    protected $_script;
 
-	protected $_type = '';
-	protected $_index = '';
+    /**
+     * @var boolean
+     */
+    protected $_autoPopulate = false;
 
-	protected $_version = '';
+    /**
+     * Creates a new document
+     *
+     * @param int|string $id    OPTIONAL $id Id is create if empty
+     * @param array|string  $data  OPTIONAL Data array
+     * @param string     $type  OPTIONAL Type name
+     * @param string     $index OPTIONAL Index name
+     */
+    public function __construct($id = '', $data = array(), $type = '', $index = '')
+    {
+        $this->setId($id);
+        $this->setData($data);
+        $this->setType($type);
+        $this->setIndex($index);
+    }
 
-	/**
-	 * @var string|int Parent document id
-	 */
-	protected $_parent = '';
+    /**
+     * Sets the id of the document.
+     *
+     * @param  string            $id
+     * @return \Elastica\Document
+     */
+    public function setId($id)
+    {
+        return $this->setParam('_id', $id);
+    }
 
-	/**
-	 * @var string Optype
-	 */
-	protected $_optype = '';
+    /**
+     * Returns document id
+     *
+     * @return string|int Document id
+     */
+    public function getId()
+    {
+        return ($this->hasParam('_id')) ? $this->getParam('_id') : null;
+    }
 
-	/**
-	 * @var string Percolate
-	 */
-	protected $_percolate = '';
+    /**
+     * @return bool
+     */
+    public function hasId()
+    {
+        return '' !== (string) $this->getId();
+    }
 
-	/**
-	 * Creates a new document
-	 *
-	 * @param int    $id    OPTIONAL $id Id is create if empty
-	 * @param array  $data  OPTIONAL Data array
-	 * @param string $type  OPTIONAL Type name
-	 * @param string $index OPTIONAL Index name
-	 */
-	public function __construct($id = '', array $data = array(), $type = '', $index = '') {
-		$this->_id = $id;
-		$this->setData($data);
-		$this->setType($type);
-		$this->setIndex($index);
-	}
+    /**
+     * @param string $key
+     * @return mixed
+     */
+    public function __get($key)
+    {
+        return $this->get($key);
+    }
 
-	/**
-	 * Returns document id
-	 *
-	 * @return string|int Document id
-	 */
-	public function getId() {
-		return $this->_id;
-	}
+    /**
+     * @param string $key
+     * @param mixed $value
+     */
+    public function __set($key, $value)
+    {
+        $this->set($key, $value);
+    }
 
-	/**
-	 * Adds the given key/value pair to the document
-	 *
-	 * @param string $key   Document entry key
-	 * @param mixed  $value Document entry value
-	 * @return Elastica_Document
-	 */
-	public function add($key, $value) {
-		$this->_data[$key] = $value;
-		return $this;
-	}
+    /**
+     * @param string $key
+     * @return bool
+     */
+    public function __isset($key)
+    {
+        return $this->has($key) && null !== $this->get($key);
+    }
 
-	/**
-	 * Adds a file to the index
-	 *
-	 * To use this feature you have to call the following command in the
-	 * elasticsearch directory:
-	 * <code>
-	 * ./bin/plugin install mapper-attachments
-	 * </code>
-	 * This installs the tika file analysis plugin. More infos about supported formats
-	 * can be found here: {@link http://tika.apache.org/0.7/formats.html}
-	 *
-	 * @param string $key      Key to add the file to
-	 * @param string $filepath Path to add the file
-	 * @param string $mimeType OPTIONAL Header mime type
-	 * @return Elastica_Document
-	 */
-	public function addFile($key, $filepath, $mimeType = '') {
-		$value = base64_encode(file_get_contents($filepath));
+    /**
+     * @param string $key
+     */
+    public function __unset($key)
+    {
+        $this->remove($key);
+    }
 
-		if (!empty($mimeType)) {
-			$value = array('_content_type' => $mimeType, '_name' => $filepath, 'content' => $value,);
-		}
+    /**
+     * @param string $key
+     * @return mixed
+     * @throws \Elastica\Exception\InvalidException
+     */
+    public function get($key)
+    {
+        if (!$this->has($key)) {
+            throw new InvalidException("Field {$key} does not exist");
+        }
+        return $this->_data[$key];
+    }
 
-		$this->add($key, $value);
-		return $this;
-	}
+    /**
+     * @param string $key
+     * @param mixed $value
+     * @throws \Elastica\Exception\InvalidException
+     * @return \Elastica\Document
+     */
+    public function set($key, $value)
+    {
+        if (!is_array($this->_data)) {
+            throw new InvalidException('Document data is serialized data. Data creation is forbidden.');
+        }
+        $this->_data[$key] = $value;
 
-	/**
-	 * @param string $key     Document key
-	 * @param string $content Raw file content
-	 * @return Elastica_Document
-	 */
-	public function addFileContent($key, $content) {
-		return $this->add($key, base64_encode($content));
-	}
+        return $this;
+    }
 
-	/**
-	 * Adds a geopoint to the document
-	 *
-	 * Geohashes re not yet supported
-	 *
-	 * @param string $key       Field key
-	 * @param float  $latitude  Latitud value
-	 * @param float  $longitude Longitude value
-	 * @link http://www.elasticsearch.com/docs/elasticsearch/mapping/geo_point/
-	 * @return Elastica_Document
-	 */
-	public function addGeoPoint($key, $latitude, $longitude) {
+    /**
+     * @param string $key
+     * @return bool
+     */
+    public function has($key)
+    {
+        return is_array($this->_data) && array_key_exists($key, $this->_data);
+    }
 
-		$value = array('lat' => $latitude, 'lon' => $longitude,);
+    /**
+     * @param string $key
+     * @throws \Elastica\Exception\InvalidException
+     * @return \Elastica\Document
+     */
+    public function remove($key)
+    {
+        if (!$this->has($key)) {
+            throw new InvalidException("Field {$key} does not exist");
+        }
+        unset($this->_data[$key]);
 
-		$this->add($key, $value);
-		return $this;
-	}
+        return $this;
+    }
 
-	/**
-	 * Overwrites the curent document data with the given data
-	 *
-	 * @param array $data Data array
-	 * @return Elastica_Document
-	 */
-	public function setData(array $data) {
-		$this->_data = $data;
-		return $this;
-	}
+    /**
+     * Adds the given key/value pair to the document
+     *
+     * @deprecated
+     * @param  string            $key   Document entry key
+     * @param  mixed             $value Document entry value
+     * @return \Elastica\Document
+     */
+    public function add($key, $value)
+    {
+        return $this->set($key, $value);
+    }
 
-	/**
-	 * Sets lifetime of document
-	 *
-	 * @param string $ttl
-	 * @return Elastica_Document
-	 */
-	public function setTTL($ttl) {
-		return $this->add('_ttl', $ttl);
-	}
+    /**
+     * Adds a file to the index
+     *
+     * To use this feature you have to call the following command in the
+     * elasticsearch directory:
+     * <code>
+     * ./bin/plugin -install elasticsearch/elasticsearch-mapper-attachments/1.6.0
+     * </code>
+     * This installs the tika file analysis plugin. More infos about supported formats
+     * can be found here: {@link http://tika.apache.org/0.7/formats.html}
+     *
+     * @param  string            $key      Key to add the file to
+     * @param  string            $filepath Path to add the file
+     * @param  string            $mimeType OPTIONAL Header mime type
+     * @return \Elastica\Document
+     */
+    public function addFile($key, $filepath, $mimeType = '')
+    {
+        $value = base64_encode(file_get_contents($filepath));
 
-	/**
-	 * Returns the document data
-	 *
-	 * @return array Document data
-	 */
-	public function getData() {
-		return $this->_data;
-	}
+        if (!empty($mimeType)) {
+            $value = array('_content_type' => $mimeType, '_name' => $filepath, 'content' => $value,);
+        }
 
-	/**
-	 * Sets the document type name
-	 *
-	 * @param string $type Type name
-	 * @return Elastica_Document Current object
-	 */
-	public function setType($type) {
-		$this->_type = $type;
-		return $this;
-	}
+        $this->set($key, $value);
 
-	/**
-	 * @return string Document type name
-	 * @throws Elastica_Exception_Invalid
-	 */
-	public function getType() {
-		$type = $this->_type;
+        return $this;
+    }
 
-		if (empty($type)) {
-			throw new Elastica_Exception_Invalid('Type not set');
-		}
-		return $type;
-	}
+    /**
+     * Add file content
+     *
+     * @param  string            $key     Document key
+     * @param  string            $content Raw file content
+     * @return \Elastica\Document
+     */
+    public function addFileContent($key, $content)
+    {
+        return $this->set($key, base64_encode($content));
+    }
 
-	/**
-	 * Sets the document index name
-	 *
-	 * @param string $index Index name
-	 * @return Elastica_Document Current object
-	 */
-	public function setIndex($index) {
-		$this->_index = $index;
-		return $this;
-	}
+    /**
+     * Adds a geopoint to the document
+     *
+     * Geohashes are not yet supported
+     *
+     * @param string $key       Field key
+     * @param float  $latitude  Latitude value
+     * @param float  $longitude Longitude value
+     * @link http://www.elasticsearch.org/guide/reference/mapping/geo-point-type.html
+     * @return \Elastica\Document
+     */
+    public function addGeoPoint($key, $latitude, $longitude)
+    {
+        $value = array('lat' => $latitude, 'lon' => $longitude,);
 
-	/**
-	 * @return string Index name
-	 * @throws Elastica_Exception_Invalid
-	 */
-	public function getIndex() {
-		$index = $this->_index;
+        $this->set($key, $value);
 
-		if (empty($index)) {
-			throw new Elastica_Exception_Invalid('Index not set');
-		}
-		return $index;
-	}
+        return $this;
+    }
 
-	/**
-	 * Sets the version of a document for use with optimistic concurrency control
-	 *
-	 * @param int $version Document version
-	 * @return Elastica_Document Current object
-	 * @link http://www.elasticsearch.org/blog/2011/02/08/versioning.html
-	 */
-	public function setVersion($version) {
-		if ($version !== '') {
-			$this->_version = (int) $version;
-		}
-		return $this;
-	}
+    /**
+     * Overwrites the current document data with the given data
+     *
+     * @param  array|string             $data Data array
+     * @return \Elastica\Document
+     */
+    public function setData($data)
+    {
+        $this->_data = $data;
 
-	/**
-	 * Returns document version
-	 *
-	 * @return string|int Document version
-	 */
-	public function getVersion() {
-		return $this->_version;
-	}
+        return $this;
+    }
 
-	/**
-	 * Sets parent document id
-	 *
-	 * @param string|int $parent Parent document id
-	 * @return Elastica_Document Current object
-	 * @link http://www.elasticsearch.org/guide/reference/mapping/parent-field.html
-	 */
-	public function setParent($parent) {
-		$this->_parent = $parent;
-		return $this;
-	}
+    /**
+     * Sets lifetime of document
+     *
+     * @param  string            $ttl
+     * @return \Elastica\Document
+     */
+    public function setTtl($ttl)
+    {
+        return $this->setParam('_ttl', $ttl);
+    }
 
-	/**
-	 * Returns the parent document id
-	 *
-	 * @return string|int Parent document id
-	 */
-	public function getParent() {
-		return $this->_parent;
-	}
+    /**
+     * @return string
+     */
+    public function getTtl()
+    {
+        return $this->getParam('_ttl');
+    }
 
-	/**
-	 * Set operation type
-	 *
-	 * @param string $optype Only accept create
-	 * @return Elastica_Document Current object
-	 */
-	public function setOpType($optype) {
-		$this->_optype = $optype;
-		return $this;
-	}
+    /**
+     * @return bool
+     */
+    public function hasTtl()
+    {
+        return $this->hasParam('_ttl');
+    }
 
-	/**
-	 * Get operation type
-	 */
-	public function getOpType() {
-		return $this->_optype;
-	}
+    /**
+     * Returns the document data
+     *
+     * @return array|string Document data
+     */
+    public function getData()
+    {
+        return $this->_data;
+    }
 
-	/**
-	 * Set percolate query param
-	 *
-	 * @param string $value percolator filter
-	 * @return Elastica_Document
-	 */
-	public function setPercolate($value = '*') {
-		$this->_percolate = $value;
-		return $this;
-	}
+    /**
+     * Sets the document type name
+     *
+     * @param  string            $type Type name
+     * @return \Elastica\Document Current object
+     */
+    public function setType($type)
+    {
+        if ($type instanceof Type) {
+            $this->setIndex($type->getIndex());
+            $type = $type->getName();
+        }
+        return $this->setParam('_type', $type);
+    }
 
-	/**
-	 * Get percolate parameter
-	 *
-	 * @return string
-	 */
-	public function getPercolate() {
-		return $this->_percolate;
-	}
+    /**
+     * Return document type name
+     *
+     * @return string                              Document type name
+     * @throws \Elastica\Exception\InvalidException
+     */
+    public function getType()
+    {
+        return $this->getParam('_type');
+    }
 
-	/**
-	 * Returns the document as an array
-	 * @return array
-	 */
-	public function toArray() {
-		$index = array('_index' => $this->getIndex(), '_type' => $this->getType(), '_id' => $this->getId());
+    /**
+     * Sets the document index name
+     *
+     * @param  string            $index Index name
+     * @return \Elastica\Document Current object
+     */
+    public function setIndex($index)
+    {
+        if ($index instanceof Index) {
+            $index = $index->getName();
+        }
+        return $this->setParam('_index', $index);
+    }
 
-		$version = $this->getVersion();
-		if (!empty($version)) {
-			$index['_version'] = $version;
-		}
+    /**
+     * Get the document index name
+     *
+     * @return string                              Index name
+     * @throws \Elastica\Exception\InvalidException
+     */
+    public function getIndex()
+    {
+        return $this->getParam('_index');
+    }
 
-		$parent = $this->getParent();
-		if (!empty($parent)) {
-			$index['_parent'] = $parent;
-		}
+    /**
+     * Sets the version of a document for use with optimistic concurrency control
+     *
+     * @param  int               $version Document version
+     * @return \Elastica\Document Current object
+     * @link http://www.elasticsearch.org/blog/2011/02/08/versioning.html
+     */
+    public function setVersion($version)
+    {
+        return $this->setParam('_version', (int) $version);
+    }
 
-		$params[] = $action;
-		$params[] = $doc->getData();
-	}
+    /**
+     * Returns document version
+     *
+     * @return string|int Document version
+     */
+    public function getVersion()
+    {
+        return $this->getParam('_version');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasVersion()
+    {
+        return $this->hasParam('_version');
+    }
+
+    /**
+     * Sets the version_type of a document
+     * Default in ES is internal, but you can set to external to use custom versioning
+     *
+     * @param  int               $versionType Document version type
+     * @return \Elastica\Document Current object
+     * @link http://www.elasticsearch.org/guide/reference/api/index_.html
+     */
+    public function setVersionType($versionType)
+    {
+        return $this->setParam('_version_type', $versionType);
+    }
+
+    /**
+     * Returns document version type
+     *
+     * @return string|int Document version type
+     */
+    public function getVersionType()
+    {
+        return $this->getParam('_version_type');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasVersionType()
+    {
+        return $this->hasParam('_version_type');
+    }
+
+    /**
+     * Sets parent document id
+     *
+     * @param  string|int        $parent Parent document id
+     * @return \Elastica\Document Current object
+     * @link http://www.elasticsearch.org/guide/reference/mapping/parent-field.html
+     */
+    public function setParent($parent)
+    {
+        return $this->setParam('_parent', $parent);
+    }
+
+    /**
+     * Returns the parent document id
+     *
+     * @return string|int Parent document id
+     */
+    public function getParent()
+    {
+        return $this->getParam('_parent');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasParent()
+    {
+        return $this->hasParam('_parent');
+    }
+
+    /**
+     * Set operation type
+     *
+     * @param  string            $opType Only accept create
+     * @return \Elastica\Document Current object
+     */
+    public function setOpType($opType)
+    {
+        return $this->setParam('_op_type', $opType);
+    }
+
+    /**
+     * Get operation type
+     * @return string
+     */
+    public function getOpType()
+    {
+        return $this->getParam('_op_type');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasOpType()
+    {
+        return $this->hasParam('_op_type');
+    }
+
+    /**
+     * Set percolate query param
+     *
+     * @param  string            $value percolator filter
+     * @return \Elastica\Document
+     */
+    public function setPercolate($value = '*')
+    {
+        return $this->setParam('_percolate', $value);
+    }
+
+    /**
+     * Get percolate parameter
+     *
+     * @return string
+     */
+    public function getPercolate()
+    {
+        return $this->getParam('_percolate');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasPercolate()
+    {
+        return $this->hasParam('_percolate');
+    }
+
+    /**
+     * Set routing query param
+     *
+     * @param  string            $value routing
+     * @return \Elastica\Document
+     */
+    public function setRouting($value)
+    {
+        return $this->setParam('_routing', $value);
+    }
+
+    /**
+     * Get routing parameter
+     *
+     * @return string
+     */
+    public function getRouting()
+    {
+        return $this->getParam('_routing');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasRouting()
+    {
+        return $this->hasParam('_routing');
+    }
+
+    /**
+     * @param array|string $fields
+     * @return \Elastica\Document
+     */
+    public function setFields($fields)
+    {
+        if (is_array($fields)) {
+            $fields = implode(',', $fields);
+        }
+        return $this->setParam('_fields', (string) $fields);
+    }
+
+    /**
+     * @return \Elastica\Document
+     */
+    public function setFieldsSource()
+    {
+        return $this->setFields('_source');
+    }
+
+    /**
+     * @return string
+     */
+    public function getFields()
+    {
+        return $this->getParam('_fields');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasFields()
+    {
+        return $this->hasParam('_fields');
+    }
+
+    /**
+     * @param int $num
+     * @return \Elastica\Document
+     */
+    public function setRetryOnConflict($num)
+    {
+        return $this->setParam('_retry_on_conflict', (int) $num);
+    }
+
+    /**
+     * @return int
+     */
+    public function getRetryOnConflict()
+    {
+        return $this->getParam('_retry_on_conflict');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasRetryOnConflict()
+    {
+        return $this->hasParam('_retry_on_conflict');
+    }
+
+    /**
+     * @param string $timestamp
+     * @return \Elastica\Document
+     */
+    public function setTimestamp($timestamp)
+    {
+        return $this->setParam('_timestamp', $timestamp);
+    }
+
+    /**
+     * @return int
+     */
+    public function getTimestamp()
+    {
+        return $this->getParam('_timestamp');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasTimestamp()
+    {
+        return $this->hasParam('_timestamp');
+    }
+
+    /**
+     * @param bool $refresh
+     * @return \Elastica\Document
+     */
+    public function setRefresh($refresh = true)
+    {
+        return $this->setParam('_refresh', (bool) $refresh);
+    }
+
+    /**
+     * @return bool
+     */
+    public function getRefresh()
+    {
+        return $this->getParam('_refresh');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasRefresh()
+    {
+        return $this->hasParam('_refresh');
+    }
+
+    /**
+     * @param string $timeout
+     * @return \Elastica\Document
+     */
+    public function setTimeout($timeout)
+    {
+        return $this->setParam('_timeout', $timeout);
+    }
+
+    /**
+     * @return bool
+     */
+    public function getTimeout()
+    {
+        return $this->getParam('_timeout');
+    }
+
+    /**
+     * @return string
+     */
+    public function hasTimeout()
+    {
+        return $this->hasParam('_timeout');
+    }
+
+    /**
+     * @param string $timeout
+     * @return \Elastica\Document
+     */
+    public function setConsistency($timeout)
+    {
+        return $this->setParam('_consistency', $timeout);
+    }
+
+    /**
+     * @return string
+     */
+    public function getConsistency()
+    {
+        return $this->getParam('_consistency');
+    }
+
+    /**
+     * @return string
+     */
+    public function hasConsistency()
+    {
+        return $this->hasParam('_consistency');
+    }
+
+    /**
+     * @param string $timeout
+     * @return \Elastica\Document
+     */
+    public function setReplication($timeout)
+    {
+        return $this->setParam('_replication', $timeout);
+    }
+
+    /**
+     * @return string
+     */
+    public function getReplication()
+    {
+        return $this->getParam('_replication');
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasReplication()
+    {
+        return $this->hasParam('_replication');
+    }
+
+    /**
+     * @param \Elastica\Script|array|string $data
+     * @return \Elastica\Document
+     */
+    public function setScript($data)
+    {
+        $script = Script::create($data);
+        $this->_script = $script;
+
+        return $this;
+    }
+
+    /**
+     * @return \Elastica\Script
+     */
+    public function getScript()
+    {
+        return $this->_script;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasScript()
+    {
+        return null !== $this->_script;
+    }
+
+    /**
+     * @param bool $autoPopulate
+     * @return $this
+     */
+    public function setAutoPopulate($autoPopulate = true)
+    {
+        $this->_autoPopulate = (bool) $autoPopulate;
+
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isAutoPopulate()
+    {
+        return $this->_autoPopulate;
+    }
+
+    /**
+     * Returns the document as an array
+     * @return array
+     */
+    public function toArray()
+    {
+        $doc = $this->getParams();
+        $doc['_source'] = $this->getData();
+
+        return $doc;
+    }
+
+    /**
+     * @param array $fields if empty array all options will be returned, field names can be either with underscored either without, i.e. _percolate, routing
+     * @param bool $withUnderscore should option keys contain underscore prefix
+     * @return array
+     */
+    public function getOptions(array $fields = array(), $withUnderscore = false)
+    {
+        if (!empty($fields)) {
+            $data = array();
+            foreach ($fields as $field) {
+                $key = '_' . ltrim($field, '_');
+                if ($this->hasParam($key) && '' !== (string) $this->getParam($key)) {
+                    $data[$key] = $this->getParam($key);
+                }
+            }
+        } else {
+            $data = $this->getParams();
+        }
+        if (!$withUnderscore) {
+            foreach ($data as $key => $value) {
+                $data[ltrim($key, '_')] = $value;
+                unset($data[$key]);
+            }
+        }
+        return $data;
+    }
 }

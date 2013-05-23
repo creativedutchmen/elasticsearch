@@ -1,15 +1,16 @@
 Elastica: elasticsearch PHP Client
 ==================================
-
 [![Build Status](https://secure.travis-ci.org/ruflin/Elastica.png?branch=master)](http://travis-ci.org/ruflin/Elastica)
+
+Current stable version: [v0.19.8.0](https://github.com/ruflin/Elastica/tree/v0.19.8.0)
 
 Documentation
 ---------------------
-Check out the [Elastica documentation](http://ruflin.github.com/Elastica/) to find out how Elastica works. If you have questions, don't hestitate to ask them in the [Elastica google group](https://groups.google.com/group/elastica-php-client). Issues should go to the [issue tracker from github](https://github.com/ruflin/Elastica/issues).
+Check out the [Elastica documentation](http://Elastica.io/) to find out how Elastica works. If you have questions, don't hesitate to ask them in the [Elastica google group](https://groups.google.com/group/elastica-php-client). Issues should go to the [issue tracker from github](https://github.com/ruflin/Elastica/issues).
 
 About
 ---------------------
-PHP client for the distributed search engine [elasticsearch](http://www.elasticsearch.com/) which is 
+PHP client for the distributed search engine [elasticsearch](http://www.elasticsearch.org/) which is
 based on [Lucene](http://lucene.apache.org/java/docs/index.html) and can be an alternative to [solr](http://lucene.apache.org/solr/).
 The client naming and structure is consistent with [Zend Framework](http://framework.zend.com/)
 and other PHP frameworks. This makes it easy to use the client in combination with Zend Framework.
@@ -24,11 +25,16 @@ The version numbers are consistent with elasticsearch. The version number 0.16.0
 
 Compatibility
 -------------
-At the moment the client should be backward compatible to PHP 5.2. That's the reason why 
-the client was not directly built with namespaces and other nice PHP 5.3 features.
+Elastica is tested with PHP 5.3.3 and later. Versions prior and equal to v0.19.8.0 are compatible with PHP 5.2
 
 File indexing
 -------------
 File upload is supported but the mapper attachement plugin has to be installed
 
-	./bin/plugin install mapper-attachments
+    ./bin/plugin -install elasticsearch/elasticsearch-mapper-attachments/1.6.0
+
+Contributing
+------------
+Help is very welcomed, but code contributions must be done in respect of [PSR-2](https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-2-coding-style-guide.md).
+
+See [Coding guidelines](https://github.com/ruflin/Elastica/wiki/Coding-guidelines) for tips on how to do so.
