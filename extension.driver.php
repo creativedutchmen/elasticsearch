@@ -36,11 +36,6 @@
 					'page' => '/system/preferences/',
 					'delegate' => 'Save',
 					'callback' => 'savePreferences'
-				),
-				array(
-					'page'		=> '/frontend/',
-					'delegate'	=> 'FrontendPageResolved',
-					'callback'	=> 'generate_session'
 				)
 			);
 		}
